@@ -1,3 +1,5 @@
+\\ Download challenge files from DEFIv2 github page: https://github.com/martinfeussner/DEFIv2/tree/main/challenge-files
+
 P<x>:= PolynomialRing( Rationals() );
 K:= NumberField(x^16 + x + 1);
 R:= Integers(K);
