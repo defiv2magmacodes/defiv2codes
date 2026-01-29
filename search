@@ -1,0 +1,96 @@
+P<x>:= PolynomialRing( Rationals() );
+K:= NumberField(x^16 + x + 1);
+R:= Integers(K);
+
+C:= eval(Read("C.txt"));
+C:= Matrix(4, ChangeUniverse(&cat C, K));
+h:= eval(Read("h.txt"));
+h:= Vector(K, h);
+z:= eval(Read("z.txt"));
+z:= [ Vector(ChangeUniverse(e, K)) : e in z ];
+
+function PrimitiveVector(v)
+  d:= Denominator(v);
+  if d eq 1 then return v; end if;
+  v:= d * v;
+  g:= v[1] * R;
+  for i in [2..Degree(v)] do
+    g:= GCD(g, v[i]*R);
+  end for;
+  ok, x:= IsPrincipal(g); assert ok;
+  return v / x;
+end function;
+
+function MySol(M, v)
+  M:= Matrix(R, M);
+  v:= Vector(R, v);
+  V:= Parent(v);
+  B:= Basis(R);
+  MM:= Matrix(Integers(), [ &cat[ Eltseq(b*x) : x in Eltseq(M[i]) ] : b in B, i in [1..Nrows(M) ] ]);
+  vv:= Vector(Integers(), &cat[ Eltseq(v[i]) : i in [1..Degree(v)] ]);
+  s, KK:= Solution(MM, vv);
+
+  LL:= LatticeWithBasis(Matrix(LLL(Basis(KK))));
+  c:= ClosestVector(LL, s);
+  s:= s-c;
+
+  s:= Vector([ R ! p : p in Partition(Eltseq(s), Degree(R)) ]);
+  Mod:= Module([ Vector([ R ! p : p in Partition(Eltseq(b), Degree(R)) ]) : b in Basis(KK) ]);
+  B:= [ p[2] * x where _,x:= IsPrincipal(p[1]) : p in PseudoBasis(Mod)  ];
+  return s, B;
+end function;
+
+function MyHeight(v)
+  h:= 0;
+  for x in Eltseq(v) do
+    m:= Max([ Abs(e) : e in Eltseq(x) ]);
+    if m gt h then h:= m; end if;
+  end for;
+  return h;
+end function;
+
+v:= KernelMatrix(ColumnSubmatrix(C, [2..4]))[1];
+v:= PrimitiveVector(v);
+ok, u:= IsSquare( (v*C, v) );
+v:= v/u;
+CC:= Submatrix(C,2,2,3,3);
+
+
+ok, p:= HasRationalPoint(Conic(CC)); assert ok;
+x:= PrimitiveVector(Vector(Eltseq(p)));
+
+
+y, B:= MySol(CC * Matrix(1, Eltseq(x)), Vector([R!1]));
+y:= Vector(K, y);
+
+a:= K ! [ Round(e) : e in Eltseq((y*CC, y) / 2) ];
+y:= y-a*x;
+
+w:= PrimitiveVector(Kernel(CC * Transpose(Matrix([x,y]))).1);
+ok, u:= IsSquare( -(w*CC, w) );
+w:= w/u;
+
+BB:= MatrixRing(K, 4) ! 0;
+BB[1]:= v;
+InsertBlock(~BB, Matrix([x,y,w]), 2, 2);
+
+
+LL:= LatticeWithBasis( Matrix([ &cat[ Eltseq(e) : e in Eltseq(BB[2]*b) ] : b in Basis(R) ] ));
+s:= ClosestVector(LL,  Vector( &cat[ Eltseq(e) : e in Eltseq(v+BB[4]) ]));
+s:= Vector( [ K ! p : p in Partition(Eltseq(s), 16) ] );                  
+ww:= BB[4] - s;
+
+"    h | their |   our | small";
+"=============================";
+for i in [1..20] do
+  m1:= MyHeight( [h[i]] );
+  m2:= MyHeight( Eltseq(z[i])[2..4] );
+  t:= h[i] * (v+BB[4]);
+  assert (t*C, t) eq 0 and t[1] eq h[i];
+  m3:= MyHeight(t);
+  tt:= h[i] * (v+ww);
+  assert (tt*C, tt) eq 0 and tt[1] eq h[i];
+  m4:= MyHeight(tt);
+  Sprintf("%5m | %5m | %5m | %5m", Ceiling(Log(10, m1)), Ceiling(Log(10, m2)), Ceiling(Log(10, m3)), Ceiling(Log(10, m4)) );
+end for;
+
