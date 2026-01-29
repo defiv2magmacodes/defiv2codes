@@ -1,0 +1,6 @@
+P<x>:= PolynomialRing( Rationals());
+K:= NumberField(x^28 + x +1);    
+R:= Integers(K);
+ClassGroup(K);
+L:= LatticeModule(DiagonalMatrix(K,[1,1,-1,-1]));
+GenusRepresentatives(L);
