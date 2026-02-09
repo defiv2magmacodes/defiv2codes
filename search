@@ -5,7 +5,7 @@ SetClassGroupBounds("GRH");
 P<x>:= PolynomialRing( Rationals() );
 C:= eval(Read("C.txt"));
 m:= #C[1,1];
-K:= NumberField(x^m + x + 1); \\replace m = 16 for DEFI challenge files, this code will work for any value of m.
+K:= NumberField(x^m + x + 1); \\replace m = 16 for DEFI challenge files. This code will work for any value of m.
 R:= Integers(K);
 
 C:= Matrix(4, ChangeUniverse(&cat C, K));
