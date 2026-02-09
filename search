@@ -1,28 +1,26 @@
 \\ Download challenge files from DEFIv2 github page: https://github.com/martinfeussner/DEFIv2/tree/main/challenge-files
 
+//SetVerbose("Conic", 2);
+SetClassGroupBounds("GRH");
 P<x>:= PolynomialRing( Rationals() );
-K:= NumberField(x^16 + x + 1);
+C:= eval(Read("C.txt"));
+m:= #C[1,1];
+K:= NumberField(x^m + x + 1); \\replace m = 16 for DEFI challenge files, this code will work for any value of m.
 R:= Integers(K);
 
-C:= eval(Read("C.txt"));
 C:= Matrix(4, ChangeUniverse(&cat C, K));
-h:= eval(Read("h.txt"));
-h:= Vector(K, h);
-z:= eval(Read("z.txt"));
-z:= [ Vector(ChangeUniverse(e, K)) : e in z ];
+h:= Vector(K, eval(Read("h.txt")));
+z_challenge:= [ Vector(ChangeUniverse(e, K)) : e in eval(Read("z.txt")) ];
 
 function PrimitiveVector(v)
-  d:= Denominator(v);
-  if d eq 1 then return v; end if;
-  v:= d * v;
-  g:= v[1] * R;
-  for i in [2..Degree(v)] do
-    g:= GCD(g, v[i]*R);
-  end for;
-  ok, x:= IsPrincipal(g); assert ok;
+  v:= Denominator(v) * v;
+  I:= ideal< R | Eltseq(v) >;
+  ok, x:= IsPrincipal(I); assert ok;
   return v / x;
 end function;
 
+// Solves xM = v over R by working over Z.
+// This works but is not pretty.
 function MySol(M, v)
   M:= Matrix(R, M);
   v:= Vector(R, v);
@@ -32,67 +30,76 @@ function MySol(M, v)
   vv:= Vector(Integers(), &cat[ Eltseq(v[i]) : i in [1..Degree(v)] ]);
   s, KK:= Solution(MM, vv);
 
+  // not needed but makes the remaining steps nicer
   LL:= LatticeWithBasis(Matrix(LLL(Basis(KK))));
   c:= ClosestVector(LL, s);
   s:= s-c;
-
   s:= Vector([ R ! p : p in Partition(Eltseq(s), Degree(R)) ]);
-  Mod:= Module([ Vector([ R ! p : p in Partition(Eltseq(b), Degree(R)) ]) : b in Basis(KK) ]);
-  B:= [ p[2] * x where _,x:= IsPrincipal(p[1]) : p in PseudoBasis(Mod)  ];
-  return s, B;
+  return s;
 end function;
 
-function MyHeight(v)
-  h:= 0;
-  for x in Eltseq(v) do
-    m:= Max([ Abs(e) : e in Eltseq(x) ]);
-    if m gt h then h:= m; end if;
-  end for;
-  return h;
-end function;
+MyHeight:= func< v | Max([ Abs(e) : e in Eltseq(K!x), x in Eltseq(v) ]) >;
 
-v:= KernelMatrix(ColumnSubmatrix(C, [2..4]))[1];
-v:= PrimitiveVector(v);
-ok, u:= IsSquare( (v*C, v) );
-v:= v/u;
+// We start with t perp to e_2,e_3,e_4 and t[1] = 1
+t:= KernelMatrix(ColumnSubmatrix(C, [2..4]))[1];
+t /:= t[1];
+assert (t*C, t) eq 1;
 CC:= Submatrix(C,2,2,3,3);
 
-
-ok, p:= HasRationalPoint(Conic(CC)); assert ok;
+// So t, e_2, e_3, e_4 generate R^4 and their Gram matrix is <1> \perp CC.
+// We are left with the problem of finding an isotropic vector in CC:
+time ok, p:= HasRationalPoint(Conic(CC)); assert ok;
 x:= PrimitiveVector(Vector(Eltseq(p)));
 
-
-y, B:= MySol(CC * Matrix(1, Eltseq(x)), Vector([R!1]));
+// Now we construct y in <e_2,e_3,e_4> with (x,y) = 1.
+// Then <x,y> is unimodular, so it splits off from CC
+// So <x,y>^perp = <z> and comparing determinants shows
+// that (z,z) = -u^2 for some unit u in R.
+y:= MySol(CC * Matrix(1, Eltseq(x)), Vector([R!1]));
 y:= Vector(K, y);
-
+// This step is not needed, but makes the Gram-matrix look nicer
 a:= K ! [ Round(e) : e in Eltseq((y*CC, y) / 2) ];
 y:= y-a*x;
+// Now get z with (z,z) = -1
+z:= Kernel(CC * Transpose(Matrix([x,y]))).1;
+ok, u:= IsSquare( -(z*CC, z) );
+z:= z/u;
+assert CanChangeRing(z, R);	// z must be integral automatically
+// Voila, <t,x,y,z> is a basis with Gram matrix G
+//       ( 0 1 )
+// <1> + ( 1 * )  + <-1>
+// Now we can sign hashes/messages
+T:= MatrixRing(K, 4) ! 0;
+T[1]:= t;
+InsertBlock(~T, Matrix([x,y,z]), 2, 2);
 
-w:= PrimitiveVector(Kernel(CC * Transpose(Matrix([x,y]))).1);
-ok, u:= IsSquare( -(w*CC, w) );
-w:= w/u;
+// Given a hash h, then (h|s) the last 3 coefficients of
+// (h,0,0,h)*T = h * (t+z) yields a valid hash.
 
-BB:= MatrixRing(K, 4) ! 0;
-BB[1]:= v;
-InsertBlock(~BB, Matrix([x,y,w]), 2, 2);
-
-
-LL:= LatticeWithBasis( Matrix([ &cat[ Eltseq(e) : e in Eltseq(BB[2]*b) ] : b in Basis(R) ] ));
-s:= ClosestVector(LL,  Vector( &cat[ Eltseq(e) : e in Eltseq(v+BB[4]) ]));
+// We can use (h,-hb,0,h)*T = h(t + w - bx) where bx is close to t+w
+LL:= LatticeWithBasis( Matrix([ &cat[ Eltseq(e) : e in Eltseq(T[2]*b) ] : b in Basis(R) ] ));
+s:= ClosestVector(LL,  Vector( &cat[ Eltseq(e) : e in Eltseq(t+T[4]) ]));
 s:= Vector( [ K ! p : p in Partition(Eltseq(s), 16) ] );                  
-ww:= BB[4] - s;
+k:= t + T[4] - s;
 
-"    h | their |   our | small";
-"=============================";
+
+"    h | their |   our | small |  tiny ";
+"=====================================";
 for i in [1..20] do
   m1:= MyHeight( [h[i]] );
-  m2:= MyHeight( Eltseq(z[i])[2..4] );
-  t:= h[i] * (v+BB[4]);
-  assert (t*C, t) eq 0 and t[1] eq h[i];
-  m3:= MyHeight(t);
-  tt:= h[i] * (v+ww);
-  assert (tt*C, tt) eq 0 and tt[1] eq h[i];
-  m4:= MyHeight(tt);
-  Sprintf("%5m | %5m | %5m | %5m", Ceiling(Log(10, m1)), Ceiling(Log(10, m2)), Ceiling(Log(10, m3)), Ceiling(Log(10, m4)) );
-end for;
+  m2:= MyHeight( z_challenge[i] );
+  s:= h[i] * (t+T[4]);
+  assert (s*C, s) eq 0 and s[1] eq h[i];
+  m3:= MyHeight(s);
+  ss:= h[i] * k;
+  assert (ss*C, ss) eq 0 and ss[1] eq h[i];
+  m4:= MyHeight(ss);
 
+  // We could also use h*(v+w) - b*x for some b in R.
+  sss:= ClosestVector(LL,  Vector( &cat[ Eltseq(e) : e in Eltseq(s) ]));
+  sss:= s-Vector( [ K ! p : p in Partition(Eltseq(sss), 16) ] ); 
+  assert (sss*C, sss) eq 0 and sss[1] eq h[i];
+  m5:= MyHeight(sss);
+
+  Sprintf("%5m | %5m | %5m | %5m | %5m", Ceiling(Log(2, m1)), Ceiling(Log(2, m2)), Ceiling(Log(2, m3)), Ceiling(Log(2, m4)), Ceiling(Log(2, m5)) );
+end for;
