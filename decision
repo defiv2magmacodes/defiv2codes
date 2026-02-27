@@ -1,3 +1,4 @@
+\\Solving Decision Problem
 P<x>:= PolynomialRing( Rationals());
 K:= NumberField(x^28 + x +1);    
 R:= Integers(K);
