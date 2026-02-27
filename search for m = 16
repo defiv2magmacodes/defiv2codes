@@ -1,4 +1,4 @@
-\\ Download challenge files from DEFIv2 github page: https://github.com/martinfeussner/DEFIv2/tree/main/challenge-files
+// Download challenge files from DEFIv2 github page: https://github.com/martinfeussner/DEFIv2/tree/main/challenge-files
 
 //SetVerbose("Conic", 2);
 SetClassGroupBounds("GRH");
