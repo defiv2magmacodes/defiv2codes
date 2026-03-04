@@ -1,3 +1,6 @@
+// the codes took nearly 2 weeks to find a solution.
+
+
 //SetVerbose("Conic", 2);
 SetClassGroupBounds("GRH");
 P<x>:= PolynomialRing( Rationals() );
